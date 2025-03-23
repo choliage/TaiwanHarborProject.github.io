@@ -1472,6 +1472,8 @@
                 
                 // 決定最終獲勝者
                 const winner = determineWinner();
+                
+                // 設置獲勝者資訊
                 if (winner) {
                     document.getElementById('final-winner-title').textContent = `最後的冠軍是第${winner}組！`;
                     document.getElementById('final-winner-info').textContent = 
@@ -1481,14 +1483,14 @@
                     document.getElementById('final-winner-info').textContent = "無法確定獲勝組別";
                 }
                 
-
+                // 更新最終積分榜
                 const finalLeaderboard = document.getElementById('final-modal-leaderboard');
                 finalLeaderboard.innerHTML = '';
                 
-
+                // 將分數排序
                 const scores = [];
                 for (let group of [1, 2, 3, 5]) {
-
+                    // 查找本輪得分和距離
                     const result = results.find(r => r.group === group);
                     scores.push({
                         group: group,
@@ -1499,8 +1501,10 @@
                 }
                 scores.sort((a, b) => b.score - a.score);
                 
+                // 填充表格
                 scores.forEach((entry, index) => {
-
+                    const row = document.createElement('tr');
+                    // 檢查是否是最終獲勝組
                     const isWinner = entry.group === winner;
                     if (isWinner) {
                         row.className = 'winner-row';
@@ -1524,6 +1528,7 @@
                 });
             }
 
+            // 取得組別對應的顏色
             function getGroupColor(groupId) {
                 const colors = {
                     1: '#DA6B6B',
@@ -1534,22 +1539,26 @@
                 return colors[groupId] || '#95a5a6';
             }
 
-
+            // 進入下一個港口
             function nextPort() {
                 currentPortIndex++;
                 
                 if (currentPortIndex < selectedPortsQueue.length) {
-
+                    // 載入下一個港口
                     loadPort(selectedPortsQueue[currentPortIndex]);
                     document.getElementById('round-display').innerHTML = `
                     <span style="font-family: 'Almendra', serif; font-weight: 700;">${currentPortIndex + 1}/3</span>
                     `;
+                    
+                    // 重置地圖視圖
                     resetMapView();
                 } else {
+                    // 遊戲結束
                     document.getElementById('next-port-btn').disabled = true;
                 }
             }
 
+            // 決定最終獲勝者
             function determineWinner() {
                 let highestScore = -1;
                 let winner = null;
@@ -1564,8 +1573,9 @@
                 return winner;
             }
 
+            // 計算兩點之間的距離（公里）
             function calculateDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371;
+                const R = 6371; // 地球半徑（公里）
                 const dLat = deg2rad(lat2 - lat1);
                 const dLon = deg2rad(lon2 - lon1);
                 const a = 
