@@ -1,0 +1,1576 @@
+1140323 2248 開頭遊戲示範版.html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>18世紀台灣港口猜謎遊戲 (示範版)</title>
+    <!-- 載入Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- 載入字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Almendra:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 基本樣式 */
+        body {
+            font-family: 'Noto Serif TC', 'Microsoft JhengHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+        }
+        
+        .map-container {
+            width: 75%;
+            height: 100%;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .controls-container {
+            width: 25%;
+            height: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+            justify-content: space-between;
+        }
+        
+        /* 計時器設置區域 */
+        .timer-settings {
+            background-color: #f8f8f8;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        .timer-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border: 2px solid #333;
+            text-align: center;
+            min-width: 150px;
+        }
+        
+        /* 港口名稱顯示 */
+        .port-name-display {
+            background-color: #EAEFF8;
+            border-radius: 10px;
+            padding: 8px 5px;
+            text-align: center;
+            font-weight: 900;
+            font-size: clamp(20px, 4vw, 30px);
+            height: 15%;
+            min-height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 輪次和等級顯示 */
+        .status-row {
+            display: flex;
+            gap: 8px;
+            height: 8%;
+            min-height: 40px;
+        }
+        
+        .round-display, .level-display {
+            background-color: #FDEBE7;
+            border-radius: 10px;
+            padding: 5px;
+            text-align: center;
+            flex: 1;
+            font-family: 'Almendra', serif !important;
+            font-weight: 700;
+            font-size: clamp(18px, 3vw, 22px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 按鈕網格 */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            flex-grow: 1;
+            height: 75%;
+        }
+        
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 5px;
+            font-size: clamp(14px, 2vw, 18px);
+            font-family: 'Noto Serif TC', sans-serif !important;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            white-space: nowrap;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .next-round-btn {
+            grid-column: span 2;
+            font-size: clamp(14px, 2vw, 16px);
+        }
+        
+        /* 組別按鈕顏色 */
+        .group1-btn { background-color: #DA6B6B; font-weight: bold; }
+        .group2-btn { background-color: #DABF6B; font-weight: bold; }
+        .group3-btn { background-color: #9CB68A; font-weight: bold; }
+        .group5-btn { background-color: #7D98B1; font-weight: bold; }
+        .draw-port-btn { background-color: #780116; color: white; font-weight: 900; }
+        .confirm-pos-btn { background-color: #CDE4BE; font-weight: 900; }
+        .show-answer-btn { background-color: #E9F9FF; font-weight: 900; }
+        .show-result-btn { background-color: #E2CC8A; font-weight: 900; }
+        .next-round-btn { background-color: #CFD6E0; font-weight: 900; }
+        
+        /* 地圖標記樣式 */
+        .marker-group1 { background-color: #DA6B6B; border-radius: 50%; border: 3px solid white; }
+        .marker-group2 { background-color: #DABF6B; border-radius: 50%; border: 3px solid white; }
+        .marker-group3 { background-color: #9CB68A; border-radius: 50%; border: 3px solid white; }
+        .marker-group5 { background-color: #7D98B1; border-radius: 50%; border: 3px solid white; }
+        .answer-marker { background-color: #9b59b6; border-radius: 50%; border: 3px solid white; }
+        
+        /* 自定義彈出窗口樣式 */
+        .custom-popup .leaflet-popup-content-wrapper {
+            background-color: white;
+            border: 2px solid black;
+            border-radius: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .custom-popup .leaflet-popup-content {
+            margin: 10px;
+            min-width: 150px;
+        }
+        
+        .custom-popup .leaflet-popup-tip-container {
+            display: none; /* 隱藏指向標記的小三角 */
+        }
+        
+        /* 隱藏地圖版權信息 */
+        .leaflet-control-attribution { display: none !important; }
+        
+        /* 計時器效果 */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .timer-critical {
+            background-color: #FF5252 !important;
+            animation: pulse 1s infinite;
+        }
+        
+        .timer-warning {
+            background-color: #FFEB3B !important;
+        }
+        
+        /* 響應式設計 */
+        @media (max-aspect-ratio: 4/3) {
+            .container { flex-direction: column; }
+            .map-container { width: 100%; height: 70%; }
+            .controls-container { width: 100%; height: 30%; flex-direction: row; flex-wrap: wrap; }
+        }
+        
+        /* 模態視窗樣式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            width: 40%;
+            min-width: 280px;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+            padding: clamp(10px, 2vw, 20px);
+            position: relative;
+            margin: 0 auto;
+            font-size: clamp(12px, 2vw, 16px);
+        }
+        
+        .modal-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 2010;
+        }
+        
+        .modal-nav-btn:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        
+        .modal-nav-btn.prev {
+            left: -20px;
+        }
+        
+        .modal-nav-btn.next {
+            right: -20px;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            background-color: #f1f1f1;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: none;
+        }
+        
+        .result-header, .leaderboard-section {
+            font-family: 'Noto Serif TC', sans-serif !important;
+        }
+
+        /* 目前活動組別顯示 */
+        .active-group-display {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255,255,255,0.9);
+            padding: 8px 15px;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border: 2px solid #333;
+        }
+        
+        /* 示範版標記 */
+        .demo-label {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: #FFF2CC;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 700;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        /* 完成示範模態窗口 */
+        .demo-complete-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        
+        .demo-complete-content {
+            background-color: white;
+            width: 50%;
+            max-width: 500px;
+            border-radius: 10px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .demo-complete-title {
+            width: 100%;
+            color: #2e75b6;
+            font-family: 'Noto Serif TC', sans-serif;
+            font-weight: 900;
+            font-size: 32px;
+            text-align: center;
+            padding: 30px 0;
+            background-color: #e3f1fd;
+            position: relative;
+        }
+        
+        .demo-complete-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 6px;
+            background-color: #3982c2;
+        }
+        
+        .start-game-btn {
+            background-color: #fff4d5;
+            color: #000;
+            font-family: 'Noto Serif TC', sans-serif;
+            font-weight: 900;
+            font-size: 22px;
+            padding: 15px 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 40px 0;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        
+        .start-game-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- 計時器顯示 -->
+            <div id="timer-display" class="timer-display">
+                <div>剩餘時間</div>
+                <div id="countdown-timer">30.00</div>
+                <div>秒</div>
+            </div>
+            
+            <!-- 目前活動組別顯示 -->
+            <div id="active-group-display" class="active-group-display"></div>
+            
+            <!-- 示範版標記 -->
+            <div class="demo-label">遊戲示範</div>
+        </div>
+        
+        <div class="controls-container">
+            <!-- 計時器設置 -->
+            <div class="timer-settings">
+                <div style="margin-bottom: 8px; font-weight: bold;">計時器設置</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="timer-seconds">每組答題時間 (秒):</label>
+                    <input type="number" id="timer-seconds" min="1" max="120" value="30" style="width: 60px;">
+                    <button id="save-timer" style="padding: 5px 10px; background-color: #4CAF50; color: white;">設定</button>
+                </div>
+            </div>
+            
+            <!-- 港口名稱顯示 -->
+            <div class="port-name-display" id="port-name">請抽取港口...</div>
+            
+            <!-- 輪次和等級顯示 -->
+            <div class="status-row">
+                <div class="round-display" id="round-display">1/3</div>
+                <div class="level-display" id="level-display">Lv.<span id="port-level-value">-</span></div>
+            </div>
+            
+            <!-- 按鈕網格 -->
+            <div class="button-grid">
+                <button class="group1-btn" data-group="1">第一組</button>
+                <button class="draw-port-btn" id="random-port-btn">抽港口</button>
+                
+                <button class="group2-btn" data-group="2">第二組</button>
+                <button class="confirm-pos-btn" id="confirm-guess" disabled>確認位置</button>
+                
+                <button class="group3-btn" data-group="3">第三組</button>
+                <button class="show-answer-btn" id="show-answer-btn" disabled>公布答案</button>
+                
+                <button class="group5-btn" data-group="5">第五組</button>
+                <button class="show-result-btn" id="show-result-btn" disabled>展示本輪</button>
+                
+                <button class="next-round-btn" id="next-port-btn" disabled>下一輪(下一個港口)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結果模態視窗 -->
+    <div class="modal-overlay" id="results-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">&times;</button>
+            <button class="modal-nav-btn prev" id="prev-result-btn">&#9664;</button>
+            <button class="modal-nav-btn next" id="next-result-btn">&#9654;</button>
+            <div class="result-header" style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #eaeaea; padding-bottom: 10px;">
+                <h2 id="round-title" style="font-size: clamp(16px, 3vw, 20px); margin-bottom: 5px;"></h2>
+                <p id="port-result-name" style="font-size: clamp(14px, 2.5vw, 18px); margin-top: 5px;"></p>
+            </div>
+            <div class="winner-section" style="background-color: #fcf8e3; border-left: 5px solid #f0ad4e; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; border-radius: 4px;">
+                <div style="font-size: clamp(18px, 3vw, 24px); color: #f0ad4e; display: inline-block; margin-right: 10px;">🏆</div>
+                <div style="flex: 1;">
+                    <h3 id="winner-title" style="font-size: clamp(14px, 2.5vw, 18px); margin: 0 0 5px 0;">恭喜獲勝組別</h3>
+                    <p id="winner-info" style="font-size: clamp(12px, 2vw, 16px); margin: 0;"></p>
+                </div>
+            </div>
+            <div class="leaderboard-section" style="margin-top: 15px;">
+                <h3 style="font-size: clamp(14px, 2.5vw, 18px); margin: 0 0 8px 0;">目前的排行榜</h3>
+                <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; font-size: clamp(11px, 1.8vw, 14px);">
+                    <thead>
+                        <tr>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">排名</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">小組</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">總積分</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">本輪得分</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">本輪距離</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-leaderboard">
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最終結果模態視窗 -->
+    <div class="modal-overlay" id="final-results-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="final-modal-close">&times;</button>
+            <button class="modal-nav-btn prev" id="prev-final-result-btn">&#9664;</button>
+            <div class="result-header" style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #eaeaea; padding-bottom: 10px;">
+                <h2 style="font-size: clamp(16px, 3vw, 20px); margin-bottom: 5px;">遊戲結束 - 最終結果</h2>
+            </div>
+            <div class="winner-section" style="background-color: #fcf8e3; border-left: 5px solid #f0ad4e; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; border-radius: 4px;">
+                <div style="font-size: clamp(18px, 3vw, 24px); color: #f0ad4e; display: inline-block; margin-right: 10px;">🏆</div>
+                <div style="flex: 1;">
+                    <h3 id="final-winner-title" style="font-size: clamp(14px, 2.5vw, 18px); margin: 0 0 5px 0;">恭喜最終冠軍</h3>
+                    <p id="final-winner-info" style="font-size: clamp(12px, 2vw, 16px); margin: 0;"></p>
+                </div>
+            </div>
+            <div class="leaderboard-section" style="margin-top: 15px;">
+                <h3 style="font-size: clamp(14px, 2.5vw, 18px); margin: 0 0 8px 0;">最終排行榜</h3>
+                <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; font-size: clamp(11px, 1.8vw, 14px);">
+                    <thead>
+                        <tr>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">排名</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">小組</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">最終總積分</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">第三輪得分</th>
+                            <th style="background-color: #f2f2f2; padding: 5px 3px; text-align: left;">第三輪距離</th>
+                        </tr>
+                    </thead>
+                    <tbody id="final-modal-leaderboard">
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 完成示範模態視窗 -->
+    <div class="demo-complete-modal" id="demo-complete-modal">
+        <div class="demo-complete-content">
+            <div class="demo-complete-title">完成示範</div>
+            <button class="start-game-btn" id="start-game-btn">開始正式遊戲</button>
+        </div>
+    </div>
+
+    <script>
+        // 確保只在頁面完全載入後執行一次初始化
+        let gameInitialized = false;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            if (gameInitialized) return;
+            gameInitialized = true;
+            
+            console.log('DOM已載入，初始化遊戲...');
+            initGame();
+        });
+
+        function initGame() {
+            console.log('開始初始化遊戲');
+            
+            // 計時器變數
+            let timerSeconds = 30;
+            let currentTimer = null;
+            let currentTimerElement = document.getElementById('countdown-timer');
+            let timerDisplayElement = document.getElementById('timer-display');
+            let activeGroupDisplayElement = document.getElementById('active-group-display');
+            let timerSettingsElement = document.querySelector('.timer-settings');
+            let timerStartTime = 0;
+            let timerEndTime = 0;
+            
+            // 設置計時器
+            document.getElementById('save-timer').addEventListener('click', function() {
+                const inputValue = parseInt(document.getElementById('timer-seconds').value, 10);
+                if (inputValue >= 1 && inputValue <= 120) {
+                    timerSeconds = inputValue;
+                    alert(`每組答題時間已設置為 ${timerSeconds} 秒`);
+                } else {
+                    alert('請輸入1到120之間的秒數');
+                }
+            });
+            
+            // 示範版只有一個固定港口資料
+            const demoPort = {
+                id: 1,
+                name: "松山空港",
+                lat: 25.069722,
+                lng: 121.5525,
+                level: 100, // 示範版等級
+                difficulty: "S" // 示範用難度標記
+            };
+
+            // 遊戲狀態變數
+            let currentPort = null;
+            let selectedPortsQueue = [];
+            let currentPortIndex = 0;
+            let groupMarkers = {1: null, 2: null, 3: null, 5: null};
+            let tempGroupMarker = null;
+            let groupDistances = {1: null, 2: null, 3: null, 5: null};
+            let groupScores = {1: 0, 2: 0, 3: 0, 5: 0};
+            let groupBestGuess = {1: Infinity, 2: Infinity, 3: Infinity, 5: Infinity};
+            let answerMarker = null;
+            let activeGroup = null;
+            let resultDisplayed = false;
+            let distanceLines = {1: null, 2: null, 3: null, 5: null};
+            let distanceLabels = {1: null, 2: null, 3: null, 5: null};
+            let groupInteracted = {1: false, 2: false, 3: false, 5: false}; // 跟踪每組是否有互動
+            
+            // 地圖邊界設置 - 台北地區
+            const MAP_BOUNDS = [
+                [25.313127, 121.245190], // 北界, 西界 (西北角)
+                [24.946435, 121.885259]  // 南界, 東界 (東南角)
+            ];
+            
+            // 地圖中心點 - 松山機場附近
+            const FIXED_MAP_CENTER = [25.069722, 121.5525];
+            
+            // 檢查地圖元素是否存在
+            const mapElement = document.getElementById('map');
+            if (!mapElement) {
+                console.error('找不到地圖元素');
+                return;
+            }
+            
+            // 初始化地圖
+            let map = null;
+            try {
+                map = L.map('map', {
+                    center: FIXED_MAP_CENTER,
+                    zoom: 13,  // 適合松山機場的縮放級別
+                    minZoom: 9,
+                    maxZoom: 15,
+                    zoomControl: true,
+                    attributionControl: true
+                });
+                
+                // 添加地圖圖層
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                
+                // 隱藏attribution
+                setTimeout(function() {
+                    const attributionElements = document.querySelectorAll('.leaflet-control-attribution');
+                    attributionElements.forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }, 100);
+                
+                console.log('地圖初始化成功');
+                
+                // 初始設置地圖到指定範圍
+                resetMapView();
+            } catch (error) {
+                console.error('地圖初始化失敗:', error);
+                alert('地圖載入失敗，請刷新頁面。');
+                return;
+            }
+
+            // 自定義圖標樣式
+            function createGroupIcon(groupId) {
+                return L.divIcon({
+                    className: `marker-group${groupId}`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+            }
+
+            const answerIcon = L.divIcon({
+                className: 'answer-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            // 重置地圖視圖到預定範圍
+            function resetMapView() {
+                map.stop();
+                
+                // 以松山機場為中心
+                map.setView(FIXED_MAP_CENTER, 13, {
+                    animate: false
+                });
+                
+                console.log(`當前縮放級別: ${map.getZoom()}`);
+            }
+            
+            // 更新活動組別顯示
+            function updateActiveGroupDisplay() {
+                if (activeGroup) {
+                    activeGroupDisplayElement.style.display = 'block';
+                    activeGroupDisplayElement.innerHTML = `目前作答：第${activeGroup}組`;
+                    activeGroupDisplayElement.style.backgroundColor = getGroupColor(activeGroup);
+                    activeGroupDisplayElement.style.color = (activeGroup === 1 || activeGroup === 5) ? 'white' : 'black';
+                } else {
+                    activeGroupDisplayElement.style.display = 'none';
+                }
+            }
+            
+            // 計時器相關函數
+            function startTimer() {
+                // 清除之前的計時器
+                if (currentTimer) {
+                    clearInterval(currentTimer);
+                }
+                
+                // 隱藏計時器設置區域
+                timerSettingsElement.style.display = 'none';
+                
+                // 重置計時器樣式
+                timerDisplayElement.classList.remove('timer-warning', 'timer-critical');
+                timerDisplayElement.style.backgroundColor = 'rgba(255,255,255,0.9)';
+                
+                // 設置開始時間和結束時間
+                timerStartTime = Date.now();
+                timerEndTime = timerStartTime + (timerSeconds * 1000);
+                
+                // 顯示初始時間
+                currentTimerElement.textContent = timerSeconds.toFixed(2);
+                timerDisplayElement.style.display = 'block';
+                
+                // 更新活動組別顯示
+                updateActiveGroupDisplay();
+                
+                // 重置互動狀態
+                if (activeGroup) {
+                    groupInteracted[activeGroup] = false;
+                }
+                
+                // 禁用其他組按鈕
+                disableOtherGroupButtons(activeGroup);
+                
+                // 啟動計時器 (每10毫秒更新一次以顯示小數)
+                currentTimer = setInterval(function() {
+                    const now = Date.now();
+                    const timeLeftMs = timerEndTime - now;
+                    const timeLeftSec = Math.max(0, timeLeftMs / 1000);
+                    
+                    // 更新顯示，保留兩位小數
+                    currentTimerElement.textContent = timeLeftSec.toFixed(2);
+                    
+                    // 更新視覺效果
+                    if (timeLeftSec <= 10 && timeLeftSec > 5) {
+                        timerDisplayElement.classList.add('timer-warning');
+                    } else if (timeLeftSec <= 5) {
+                        timerDisplayElement.classList.remove('timer-warning');
+                        timerDisplayElement.classList.add('timer-critical');
+                    }
+                    
+                    // 時間到
+                    if (timeLeftSec <= 0) {
+                        clearInterval(currentTimer);
+                        handleTimeUp();
+                    }
+                }, 10);
+            }
+            
+            function stopTimer() {
+                if (currentTimer) {
+                    clearInterval(currentTimer);
+                    currentTimer = null;
+                }
+                timerDisplayElement.style.display = 'none';
+                activeGroupDisplayElement.style.display = 'none';
+                
+                // 啟用其他組按鈕
+                enableAllGroupButtons();
+            }
+            
+            function handleTimeUp() {
+                console.log('時間到！');
+                
+                // 確保有活動組別
+                if (!activeGroup) return;
+                
+                // 如果有臨時標記但未確認，則自動確認
+                if (tempGroupMarker) {
+                    console.log(`自動確認第${activeGroup}組最後點擊的位置`);
+                    document.getElementById('confirm-guess').click();
+                } else if (!groupInteracted[activeGroup]) {
+                    // 只有完全未互動的組別才判零分
+                    console.log(`第${activeGroup}組完全未互動，計為零分`);
+                    
+                    // 記錄零分和無限遠距離
+                    groupDistances[activeGroup] = Infinity;
+                    
+                    // 將該組添加到已完成標記中 (真正將該組標記為已完成)
+                    groupMarkers[activeGroup] = 'timeup'; // 特殊標記，表示因超時且未互動而被記為零分
+                    
+                    // 強制更新組按鈕狀態，確保被標記為已完成
+                    const groupBtn = document.querySelector(`button[data-group="${activeGroup}"]`);
+                    groupBtn.disabled = true;
+                    groupBtn.style.opacity = '0.5';
+                    
+                    // 檢查是否所有組都完成
+                    checkAllGroupsComplete();
+                    
+                    // 通知用戶該組已經因為超時而被記為零分
+                    setTimeout(() => {
+                        alert(`第${activeGroup}組時間已到！未進行任何操作，本輪記為0分。`);
+                    }, 100);
+                } else {
+                    // 有互動但沒有臨時標記的情況
+                    console.log(`第${activeGroup}組有互動但沒有做出選擇，重新選擇該組`);
+                    
+                    // 不將該組標記為已完成，允許重新選擇
+                    const groupBtn = document.querySelector(`button[data-group="${activeGroup}"]`);
+                    groupBtn.style.opacity = '1';
+                    groupBtn.disabled = false;
+                }
+                
+                // 重置活動組別
+                activeGroup = null;
+                updateActiveGroupDisplay();
+                
+                // 停止計時器
+                stopTimer();
+            }
+            
+            // 禁用/啟用組按鈕
+            function disableOtherGroupButtons(activeGroupId) {
+                document.querySelectorAll('button[data-group]').forEach(btn => {
+                    const groupId = parseInt(btn.getAttribute('data-group'));
+                    if (groupId !== activeGroupId && !groupMarkers[groupId]) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                    }
+                });
+            }
+            
+            function enableAllGroupButtons() {
+                document.querySelectorAll('button[data-group]').forEach(btn => {
+                    const groupId = parseInt(btn.getAttribute('data-group'));
+                    if (!groupMarkers[groupId]) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    }
+                });
+            }
+
+            // 初始化排行榜
+            function updateLeaderboard() {
+                console.log('更新排行榜');
+                const scores = [];
+                for (let group of [1, 2, 3, 5]) {
+                    scores.push({
+                        group: group,
+                        score: groupScores[group],
+                        bestGuess: groupBestGuess[group] === Infinity ? "尚無記錄" : groupBestGuess[group].toFixed(1) + " 公里"
+                    });
+                }
+                scores.sort((a, b) => b.score - a.score);
+            }
+
+            // 初始化分組按鈕事件
+            document.querySelectorAll('button[data-group]').forEach(button => {
+                button.addEventListener('click', function() {
+                    if (resultDisplayed || !currentPort) return;
+                    
+                    const groupId = parseInt(this.getAttribute('data-group'));
+                    console.log(`選擇第${groupId}組`);
+                    
+                    // 徹底檢查該組是否已完成
+                    if (groupMarkers[groupId] || this.disabled || groupDistances[groupId] === Infinity) {
+                        console.log(`第${groupId}組已完成或被禁用，不可再選擇`);
+                        // 再次確保禁用狀態
+                        this.disabled = true;
+                        this.style.opacity = '0.5';
+                        return;
+                    }
+                    
+                    // 如果有其他活動組別，先結束它
+                    if (activeGroup && activeGroup !== groupId) {
+                        stopTimer();
+                        document.querySelectorAll('button[data-group]').forEach(btn => {
+                            const btnGroupId = parseInt(btn.getAttribute('data-group'));
+                            // 只還原未完成的組別
+                            if (!groupMarkers[btnGroupId] && !btn.disabled && groupDistances[btnGroupId] !== Infinity) {
+                                btn.style.opacity = '1';
+                            } else {
+                                // 確保已完成的組別按鈕顯示為禁用
+                                btn.disabled = true;
+                                btn.style.opacity = '0.5';
+                            }
+                        });
+                    }
+                    
+                    // 設定當前按鈕為active
+                    this.style.opacity = '0.7';
+                    activeGroup = groupId;
+                    
+                    // 啟用確認按鈕，但若沒有臨時標記則禁用
+                    document.getElementById('confirm-guess').disabled = tempGroupMarker ? false : true;
+                    
+                    // 啟動計時器
+                    startTimer();
+                });
+            });
+
+            // 確認猜測按鈕
+            document.getElementById('confirm-guess').addEventListener('click', function() {
+                if (!activeGroup || !tempGroupMarker) return;
+                
+                console.log(`確認第${activeGroup}組的猜測`);
+                
+                // 將臨時標記設為正式標記
+                groupMarkers[activeGroup] = L.marker(tempGroupMarker.getLatLng(), {
+                    icon: createGroupIcon(activeGroup)
+                }).addTo(map);
+                
+                // 移除臨時標記
+                if (tempGroupMarker) {
+                    map.removeLayer(tempGroupMarker);
+                    tempGroupMarker = null;
+                }
+                
+                // 計算與實際位置的距離（此時還未顯示答案，但可以先計算）
+                const distance = calculateDistance(
+                    groupMarkers[activeGroup].getLatLng().lat,
+                    groupMarkers[activeGroup].getLatLng().lng,
+                    currentPort.lat,
+                    currentPort.lng
+                );
+                
+                groupDistances[activeGroup] = distance;
+                
+                // 禁用該組按鈕，防止再次選擇
+                document.querySelector(`button[data-group="${activeGroup}"]`).style.opacity = '0.5';
+                document.querySelector(`button[data-group="${activeGroup}"]`).disabled = true;
+                
+                // 重置活動組別
+                activeGroup = null;
+                updateActiveGroupDisplay();
+                
+                // 禁用確認按鈕
+                document.getElementById('confirm-guess').disabled = true;
+                
+                // 停止計時器
+                stopTimer();
+                
+                // 檢查是否所有組都完成猜測
+                checkAllGroupsComplete();
+            });
+
+            // 地圖點擊事件 - 放置暫時猜測標記
+            map.on('click', function(e) {
+                if (!activeGroup || resultDisplayed || !currentPort) return;
+                
+                // 檢查該組是否已完成
+                if (groupMarkers[activeGroup]) return;
+                
+                console.log(`地圖點擊 - 第${activeGroup}組，位置: ${e.latlng.lat}, ${e.latlng.lng}`);
+                
+                // 記錄該組已有互動
+                groupInteracted[activeGroup] = true;
+                
+                // 移除之前的臨時標記
+                if (tempGroupMarker) {
+                    map.removeLayer(tempGroupMarker);
+                }
+                
+                // 新增臨時標記
+                tempGroupMarker = L.marker(e.latlng, {
+                    icon: createGroupIcon(activeGroup),
+                    opacity: 0.6
+                }).addTo(map);
+                
+                // 啟用確認按鈕
+                document.getElementById('confirm-guess').disabled = false;
+            });
+
+            // 地圖移動/縮放事件 - 記錄互動
+            map.on('move', function() {
+                if (activeGroup) {
+                    groupInteracted[activeGroup] = true;
+                }
+            });
+            
+            map.on('zoom', function() {
+                if (activeGroup) {
+                    groupInteracted[activeGroup] = true;
+                }
+            });
+
+            // 檢查是否所有組都完成猜測
+            function checkAllGroupsComplete() {
+                let allComplete = true;
+                let anyComplete = false;
+                
+                // 記錄每組的完成狀態
+                const groupCompletionStatus = {};
+                
+                for (let group of [1, 2, 3, 5]) {
+                    // 檢查小組是否完成：有正常標記、timeup標記，或按鈕被禁用
+                    const hasMarker = groupMarkers[group] !== null && groupMarkers[group] !== undefined;
+                    const isTimeup = groupMarkers[group] === 'timeup';
+                    const isButtonDisabled = document.querySelector(`button[data-group="${group}"]`).disabled;
+                    const hasInfinityDistance = groupDistances[group] === Infinity;
+                    
+                    // 組完成的條件：有實際標記 或 標記為timeup 或 (按鈕被禁用且距離為無限)
+                    const groupCompleted = hasMarker || isButtonDisabled && hasInfinityDistance;
+                    
+                    // 記錄狀態用於調試
+                    groupCompletionStatus[group] = {
+                        completed: groupCompleted,
+                        hasMarker,
+                        isTimeup,
+                        isButtonDisabled,
+                        hasInfinityDistance
+                    };
+                    
+                    if (!groupCompleted) {
+                        allComplete = false;
+                    } else {
+                        anyComplete = true;
+                    }
+                    
+                    // 確保按鈕狀態與標記一致
+                    if (groupMarkers[group]) {
+                        const btn = document.querySelector(`button[data-group="${group}"]`);
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                    }
+                }
+                
+                // 詳細記錄組完成狀態
+                console.log('組完成狀態:', JSON.stringify(groupCompletionStatus, null, 2));
+                console.log('所有組都完成:', allComplete, '任一組完成:', anyComplete);
+                
+                // 公布答案按鈕僅在所有組完成時才啟用，且結果尚未顯示
+                document.getElementById('show-answer-btn').disabled = !allComplete || resultDisplayed;
+                
+                // 如果結果已顯示且至少有一組完成，啟用公布結果按鈕
+                if (anyComplete && resultDisplayed) {
+                    document.getElementById('show-result-btn').disabled = false;
+                }
+            }
+
+            // 抽港口按鈕 - 示範版只抽選松山空港
+            document.getElementById('random-port-btn').addEventListener('click', function() {
+                console.log('抽選松山空港（示範用）');
+                
+                // 設置當前港口
+                currentPort = demoPort;
+                
+                // 更新UI顯示
+                document.getElementById('port-name').innerHTML = `
+                <span style="font-family: 'Noto Serif TC', serif; font-weight: 900;">${currentPort.name}</span>
+                `;
+                document.getElementById('port-level-value').innerHTML = `
+                <span style="font-family: 'Almendra', serif; font-weight: 700;">${currentPort.level}</span>
+                `;
+                
+                // 禁用抽港口按鈕
+                this.disabled = true;
+                
+                // 隱藏計時器設置區域
+                timerSettingsElement.style.display = 'none';
+                
+                // 重置地圖視圖
+                resetMapView();
+            });
+
+            // 公布答案按鈕
+            document.getElementById('show-answer-btn').addEventListener('click', function() {
+                // 再次檢查是否所有組都已完成
+                let allComplete = true;
+                for (let group of [1, 2, 3, 5]) {
+                    // 強化檢查：組必須有標記或被禁用且距離為無限
+                    const hasCompleted = groupMarkers[group] !== null || 
+                                        (document.querySelector(`button[data-group="${group}"]`).disabled && 
+                                         groupDistances[group] === Infinity);
+                    if (!hasCompleted) {
+                        allComplete = false;
+                        break;
+                    }
+                }
+                
+                if (allComplete) {
+                    showAnswer();
+                } else {
+                    alert('尚有組別未完成作答！請等待所有組別完成。');
+                    // 重新禁用按鈕，以防萬一
+                    this.disabled = true;
+                }
+            });
+
+            // 下一個港口按鈕 - 示範版只有一輪，點擊后顯示完成示範
+            document.getElementById('next-port-btn').addEventListener('click', function() {
+                console.log('示範完成，顯示完成模態窗口');
+                
+                // 顯示完成示範模態窗口
+                document.getElementById('demo-complete-modal').style.display = 'flex';
+            });
+            
+            // 開始正式遊戲按鈕
+            document.getElementById('start-game-btn').addEventListener('click', function() {
+                // 跳轉到正式遊戲頁面
+                window.location.href = 'https://choliage.github.io/TaiwanHarborProject.github.io/main.html';
+            });
+            
+            // 顯示結果按鈕
+            document.getElementById('show-result-btn').addEventListener('click', function() {
+                console.log('顯示本輪結果按鈕點擊');
+                showResultModal('round');
+            });
+
+            // 結果模態視窗關閉按鈕
+            document.getElementById('modal-close').addEventListener('click', function() {
+                document.getElementById('results-modal').style.display = 'none';
+            });
+            
+            // 最終結果模態視窗關閉按鈕
+            document.getElementById('final-modal-close').addEventListener('click', function() {
+                document.getElementById('final-results-modal').style.display = 'none';
+            });
+            
+            // 點擊模態背景關閉模態視窗
+            document.getElementById('results-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
+            
+            // 點擊模態背景關閉最終結果模態視窗
+            document.getElementById('final-results-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
+            
+            // 下一個結果按鈕 - 切換到最終結果視圖
+            document.getElementById('next-result-btn').addEventListener('click', function() {
+                document.getElementById('results-modal').style.display = 'none';
+                showResultModal('final');
+            });
+            
+            // 上一個結果按鈕 - 切換到輪次結果視圖
+            document.getElementById('prev-result-btn').addEventListener('click', function() {
+                document.getElementById('final-results-modal').style.display = 'none';
+                showResultModal('round');
+            });
+            
+            // 上一個最終結果按鈕 - 切換到輪次結果視圖
+            document.getElementById('prev-final-result-btn').addEventListener('click', function() {
+                document.getElementById('final-results-modal').style.display = 'none';
+                showResultModal('round');
+            });
+            
+            // 顯示結果模態窗口
+            function showResultModal(type) {
+                if (type === 'round') {
+                    document.getElementById('results-modal').style.display = 'flex';
+                } else if (type === 'final') {
+                    document.getElementById('final-results-modal').style.display = 'flex';
+                }
+            }
+
+            // 重置當前港口的猜測
+            function resetGuesses() {
+                console.log('重置猜測狀態 - 清除所有標記和標籤');
+                
+                // 清除地圖上的所有標記和連線
+                for (let group of [1, 2, 3, 5]) {
+                    // 移除標記
+                    if (groupMarkers[group]) {
+                        console.log(`移除第${group}組標記`);
+                        if (groupMarkers[group] !== 'timeup') {
+                            map.removeLayer(groupMarkers[group]);
+                        }
+                        groupMarkers[group] = null;
+                    }
+                    
+                    // 移除連線
+                    if (distanceLines[group]) {
+                        console.log(`移除第${group}組連線`);
+                        map.removeLayer(distanceLines[group]);
+                        distanceLines[group] = null;
+                    }
+                    
+                    // 移除距離標籤
+                    if (distanceLabels[group]) {
+                        console.log(`移除第${group}組距離標籤`);
+                        map.removeLayer(distanceLabels[group]);
+                        distanceLabels[group] = null;
+                    }
+                    
+                    groupDistances[group] = null;
+                    groupInteracted[group] = false; // 重置互動狀態
+                    
+                    // 重置按鈕狀態
+                    const btn = document.querySelector(`button[data-group="${group}"]`);
+                    if (btn) {
+                        btn.style.opacity = '1';
+                        btn.disabled = false;
+                    }
+                }
+                
+                // 移除臨時標記
+                if (tempGroupMarker) {
+                    console.log('移除臨時標記');
+                    map.removeLayer(tempGroupMarker);
+                    tempGroupMarker = null;
+                }
+                
+                // 移除實際位置標記
+                if (answerMarker) {
+                    console.log('移除答案標記');
+                    map.removeLayer(answerMarker);
+                    answerMarker = null;
+                }
+                
+                // 重置活動組別
+                activeGroup = null;
+                updateActiveGroupDisplay();
+                
+                // 禁用確認按鈕
+                document.getElementById('confirm-guess').disabled = true;
+                
+                // 停止計時器
+                stopTimer();
+                
+                // 額外確認：掃描地圖上所有標記
+                map.eachLayer(function(layer) {
+                    // 檢查是否是標記或連線（不移除底圖）
+                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                        // 排除基礎地圖圖層
+                        if (layer._url === undefined) {
+                            console.log('清除額外發現的圖層');
+                            map.removeLayer(layer);
+                        }
+                    }
+                });
+            }
+
+            // 顯示答案
+            function showAnswer() {
+                if (!currentPort) return;
+                
+                console.log('顯示答案');
+                resultDisplayed = true;
+                
+                // 添加實際位置標記
+                answerMarker = L.marker([currentPort.lat, currentPort.lng], {
+                    icon: answerIcon
+                }).addTo(map).bindPopup(`<b>${currentPort.name}</b><br>等級: ${currentPort.level}`);
+                
+                // 添加連線和位置信息
+                for (let group of [1, 2, 3, 5]) {
+                    // 針對實際放置了地圖標記的組別
+                    if (groupMarkers[group] && groupMarkers[group] !== 'timeup') {
+                        // 添加虛線連接
+                        const markerPos = groupMarkers[group].getLatLng();
+                        const answerPos = [currentPort.lat, currentPort.lng];
+                        
+                        console.log(`創建第${group}組連線`);
+                        
+                        // 創建虛線 - 使用各組的顏色
+                        distanceLines[group] = L.polyline([markerPos, answerPos], {
+                            color: getGroupColor(group),
+                            dashArray: '5, 10',
+                            weight: 3,
+                            opacity: 0.9
+                        }).addTo(map);
+                        
+                        // 計算距離
+                        groupDistances[group] = calculateDistance(
+                            markerPos.lat,
+                            markerPos.lng,
+                            currentPort.lat,
+                            currentPort.lng
+                        );
+                        
+                        console.log(`第${group}組距離: ${groupDistances[group].toFixed(1)} 公里`);
+                        
+                        // 為標記添加點擊事件和彈出窗口，而不是固定標籤
+                        groupMarkers[group].bindPopup(
+                            `<div style="font-family: 'Noto Serif TC', sans-serif !important; font-weight: bold; font-size: 16px; text-align: center;">
+                                第${group}組：${groupDistances[group].toFixed(1)}公里
+                            </div>`,
+                            {
+                                className: 'custom-popup',
+                                closeButton: false
+                            }
+                        );
+                        
+                        // 添加懸停事件
+                        groupMarkers[group].on('mouseover', function() {
+                            this.openPopup();
+                        });
+                        
+                        // 儲存距離記錄（不再創建標籤）
+                        distanceLabels[group] = null;
+                    } else if (groupMarkers[group] === 'timeup' || groupDistances[group] === Infinity) {
+                        // 對於因超時而被記為零分或未選擇位置的組別
+                        console.log(`第${group}組未選擇位置或超時，距離設為Infinity`);
+                        groupDistances[group] = Infinity;
+                        
+                        // 確保該組按鈕被禁用
+                        const btn = document.querySelector(`button[data-group="${group}"]`);
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                    }
+                }
+                
+                // 調整地圖視圖以顯示所有標記
+                const bounds = [];
+                bounds.push([currentPort.lat, currentPort.lng]);
+                
+                for (let group of [1, 2, 3, 5]) {
+                    if (groupMarkers[group] && groupMarkers[group] !== 'timeup') {
+                        // 添加標記位置
+                        bounds.push([groupMarkers[group].getLatLng().lat, groupMarkers[group].getLatLng().lng]);
+                    }
+                }
+                
+                // 如果有標記和連線，使用它們的邊界
+                if (bounds.length > 1) {
+                    console.log('調整地圖視圖範圍');
+                    // 計算標記的邊界
+                    const markerBounds = L.latLngBounds(bounds);
+                    
+                    // 檢查邊界是否在地圖範圍內
+                    if (markerBounds.isValid()) {
+                        // 擴展邊界，確保有適當的空間
+                        const paddedBounds = markerBounds.pad(0.15);
+                        
+                        // 應用邊界，使用合適的內邊距
+                        map.fitBounds(paddedBounds, { 
+                            padding: [50, 50],
+                            maxZoom: 12,
+                            animate: true
+                        });
+                    } else {
+                        // 如果計算出的邊界無效，則使用默認視圖
+                        resetMapView();
+                    }
+                } else {
+                    // 沒有足夠的點來計算邊界
+                    resetMapView();
+                }
+                
+                // 計算分數並填充結果
+                let results = [];
+                for (let group of [1, 2, 3, 5]) {
+                    if (groupDistances[group] !== null) {
+                        const distance = groupDistances[group];
+                        
+                        // GeoGuessr風格的計分 (5000分制)
+                        let score = 0;
+                        if (distance === Infinity) {
+                            // 無限遠距離代表未選擇位置或跳過，給予零分
+                            score = 0;
+                        } else if (distance < 0.1) {
+                            score = 5000;
+                        } else if (distance < 1) {
+                            score = 5000 - (distance * 1000);
+                        } else if (distance < 5) {
+                            score = 4000 - (distance * 200);
+                        } else if (distance < 10) {
+                            score = 3000 - (distance * 100);
+                        } else if (distance < 20) {
+                            score = 2000 - (distance * 50);
+                        } else {
+                            score = Math.max(0, 1000 - (distance * 20));
+                        }
+                        score = Math.round(score);
+                        
+                        // 更新該組的總分
+                        groupScores[group] += score;
+                        
+                        // 更新該組的最佳猜測記錄
+                        if (distance !== Infinity && distance < groupBestGuess[group]) {
+                            groupBestGuess[group] = distance;
+                        }
+                        
+                        // 添加到結果數組
+                        results.push({
+                            group: group,
+                            distance: distance,
+                            score: score
+                        });
+                    }
+                }
+                
+                // 按距離排序，無限遠的放在最後
+                results.sort((a, b) => {
+                    if (a.distance === Infinity) return 1;
+                    if (b.distance === Infinity) return -1;
+                    return a.distance - b.distance;
+                });
+                
+                // 更新排行榜
+                updateLeaderboard();
+                
+                // 準備結果彈窗數據
+                prepareResultsModal(results);
+                prepareFinaLResultsModal(results);
+                
+                // 啟用顯示結果按鈕
+                document.getElementById('show-result-btn').disabled = false;
+                
+                // 啟用下一輪按鈕（示範版只有一輪，點擊后顯示完成示範）
+                document.getElementById('next-port-btn').disabled = false;
+                
+                // 確保結果和下一輪按鈕可點擊
+                console.log('確保按鈕可點擊');
+                setTimeout(() => {
+                    const nextBtn = document.getElementById('next-port-btn');
+                    const resultBtn = document.getElementById('show-result-btn');
+                    
+                    nextBtn.disabled = false;
+                    console.log('已啟用下一輪按鈕');
+                    
+                    resultBtn.disabled = false;
+                    console.log('已啟用展示結果按鈕');
+                }, 500);
+            }
+            
+            // 準備結果模態視窗數據
+            function prepareResultsModal(results) {
+                console.log('準備結果模態視窗數據');
+                
+                // 設置輪次標題
+                document.getElementById('round-title').textContent = `示範輪`;
+                
+                // 設置港口名稱
+                document.getElementById('port-result-name').textContent = currentPort.name;
+                
+                // 設置獲勝者資訊
+                const validResults = results.filter(r => r.distance !== Infinity);
+                if (validResults.length > 0) {
+                    const winner = validResults[0]; // 距離最短的是獲勝者
+                    document.getElementById('winner-title').textContent = `第${winner.group}組最接近${currentPort.name}！`;
+                    document.getElementById('winner-info').textContent = 
+                        `距離${winner.distance.toFixed(1)}公里！獲得${winner.score}分`;
+                } else {
+                    document.getElementById('winner-title').textContent = "本輪無人獲勝";
+                    document.getElementById('winner-info').textContent = "所有小組均未完成猜測";
+                }
+                
+                // 更新積分榜
+                const modalLeaderboard = document.getElementById('modal-leaderboard');
+                modalLeaderboard.innerHTML = '';
+                
+                // 將分數排序
+                const scores = [];
+                for (let group of [1, 2, 3, 5]) {
+                    // 查找本輪得分和距離
+                    const result = results.find(r => r.group === group);
+                    scores.push({
+                        group: group,
+                        score: groupScores[group],
+                        roundScore: result ? result.score : 0,
+                        distance: result ? result.distance : null
+                    });
+                }
+                scores.sort((a, b) => b.score - a.score);
+                
+                // 填充表格
+                scores.forEach((entry, index) => {
+                    const row = document.createElement('tr');
+                    // 檢查是否是獲勝組
+                    const isWinner = validResults.length > 0 && entry.group === validResults[0].group;
+                    if (isWinner) {
+                        row.className = 'winner-row';
+                        row.style.backgroundColor = 'rgba(255, 235, 59, 0.2)';
+                    }
+                    
+                    let distanceText = entry.distance === null ? "未選擇位置" : 
+                                      entry.distance === Infinity ? "未選擇位置" : 
+                                      entry.distance.toFixed(1) + ' 公里';
+                    
+                    row.innerHTML = `
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${index + 1}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">
+                            <span class="group-badge" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; background-color: ${getGroupColor(entry.group)};"></span>
+                            ${isWinner ? '第' + entry.group + '組 🏆' : '第' + entry.group + '組'}
+                        </td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${entry.score}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">+${entry.roundScore}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${distanceText}</td>
+                    `;
+                    modalLeaderboard.appendChild(row);
+                });
+            }
+            
+            // 準備最終結果模態視窗數據
+            function prepareFinaLResultsModal(results) {
+                console.log('準備最終結果模態視窗數據');
+                
+                // 決定最終獲勝者
+                const validResults = results.filter(r => r.distance !== Infinity);
+                let winner = null;
+                if (validResults.length > 0) {
+                    winner = validResults[0].group; // 使用本輪第一名作為示範用的最終冠軍
+                }
+                
+                // 設置獲勝者資訊
+                if (winner) {
+                    document.getElementById('final-winner-title').textContent = `第${winner}組獲得最終冠軍！`;
+                    document.getElementById('final-winner-info').textContent = 
+                        `總積分：${groupScores[winner]}`;
+                } else {
+                    document.getElementById('final-winner-title').textContent = "沒有獲勝者";
+                    document.getElementById('final-winner-info').textContent = "無法確定獲勝組別";
+                }
+                
+                // 更新最終積分榜
+                const finalLeaderboard = document.getElementById('final-modal-leaderboard');
+                finalLeaderboard.innerHTML = '';
+                
+                // 將分數排序
+                const scores = [];
+                for (let group of [1, 2, 3, 5]) {
+                    // 查找本輪得分和距離
+                    const result = results.find(r => r.group === group);
+                    scores.push({
+                        group: group,
+                        score: groupScores[group], // 為了示範，使用相同的分數
+                        roundScore: result ? result.score : 0,
+                        distance: result ? result.distance : null
+                    });
+                }
+                scores.sort((a, b) => b.score - a.score);
+                
+                // 填充表格
+                scores.forEach((entry, index) => {
+                    const row = document.createElement('tr');
+                    // 檢查是否是最終獲勝組
+                    const isWinner = entry.group === winner;
+                    if (isWinner) {
+                        row.className = 'winner-row';
+                        row.style.backgroundColor = 'rgba(255, 235, 59, 0.2)';
+                    }
+                    
+                    let distanceText = entry.distance === null ? "未選擇位置" : 
+                                      entry.distance === Infinity ? "未選擇位置" : 
+                                      entry.distance.toFixed(1) + ' 公里';
+                    
+                    row.innerHTML = `
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${index + 1}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">
+                            <span class="group-badge" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; background-color: ${getGroupColor(entry.group)};"></span>
+                            ${isWinner ? '第' + entry.group + '組 🏆' : '第' + entry.group + '組'}
+                        </td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${entry.score}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">+${entry.roundScore}</td>
+                        <td style="font-family: 'Noto Serif TC', sans-serif !important; padding: 8px 5px; border-bottom: 1px solid #eee;">${distanceText}</td>
+                    `;
+                    finalLeaderboard.appendChild(row);
+                });
+            }
+
+            // 取得組別對應的顏色
+            function getGroupColor(groupId) {
+                const colors = {
+                    1: '#DA6B6B',
+                    2: '#DABF6B',
+                    3: '#9CB68A',
+                    5: '#7D98B1'
+                };
+                return colors[groupId] || '#95a5a6';
+            }
+
+            // 計算兩點之間的距離（公里）
+            function calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // 地球半徑（公里）
+                const dLat = deg2rad(lat2 - lat1);
+                const dLon = deg2rad(lon2 - lon1);
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2); 
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+                const distance = R * c;
+                return distance;
+            }
+
+            function deg2rad(deg) {
+                return deg * (Math.PI/180);
+            }
+            
+            console.log('遊戲初始化完成');
+        }
+    </script>
+</body>
+</html>
